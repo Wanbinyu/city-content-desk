@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>城市内容台</title>
+  <link rel="stylesheet" href="/app.css">
+</head>
+<body>
+  <header>
+    <div>
+      <p class="mark">MVP</p>
+      <h1>城市内容台</h1>
+      <p class="lede">选热帖，拆结构，写成可审的口播。人通过之后才生成发布包，默认不上传。</p>
+    </div>
+    <nav>
+      <button type="button" class="tab on" data-tab="work">工作台</button>
+      <button type="button" class="tab" data-tab="import">导入</button>
+      <button type="button" class="tab" data-tab="settings">设置</button>
+    </nav>
+  </header>
+
+  <section id="tab-work">
+    <div class="layout">
+      <aside>
+        <div class="filters">
+          <button type="button" class="chip on" data-filter="all">全部</button>
+          <button type="button" class="chip" data-filter="北京">北京</button>
+          <button type="button" class="chip" data-filter="深圳">深圳</button>
+          <button type="button" class="chip" data-filter="上海">上海</button>
+          <button type="button" class="chip" data-filter="risk">有风险词</button>
+        </div>
+        <p id="list-count" class="muted"></p>
+        <div id="list"></div>
+      </aside>
+      <article id="detail">
+        <p class="empty">从左边选一条热帖。</p>
+      </article>
+    </div>
+  </section>
+
+  <section id="tab-import" hidden>
+    <div class="panel">
+      <h2>导入热帖</h2>
+      <p>可以贴带表头的 CSV、MediaCrawler 导出的 JSON，或一行一个抖音链接。链接本身不会自动下载，要点单条里的「用 f2 读取文案」。</p>
+      <textarea id="import-text" rows="12" placeholder="标题,点赞,评论,链接,关键词,口播"></textarea>
+      <div class="row">
+        <label class="file">选择文件<input id="import-file" type="file" accept=".csv,.json,.txt,text/plain"></label>
+        <button type="button" id="import-go" class="primary">导入</button>
+        <button type="button" id="load-demo">载入演示数据</button>
+      </div>
+      <p id="import-msg" class="muted"></p>
+    </div>
+  </section>
+
+  <section id="tab-settings" hidden>
+    <form id="settings" class="panel">
+      <h2>设置</h2>
+      <label>默认城市<input name="city" maxlength="20"></label>
+      <label>机构已可对外说明的信息<textarea name="selling_points" rows="4" placeholder="不要写效果承诺。有风险词的句子不会进复刻稿。"></textarea></label>
+      <label>发布账号名<input name="sau_account" placeholder="social-auto-upload 里登录时用的账号名"></label>
+      <label>大模型地址<input name="llm_base_url" placeholder="https://api.example.com/v1 留空则只用规则改写"></label>
+      <label>模型名<input name="llm_model" placeholder="deepseek-chat"></label>
+      <label>API key<input name="llm_api_key" type="password" autocomplete="off"></label>
+      <label>f2 的抖音 cookie<input name="f2_cookie" type="password" autocomplete="off" placeholder="只保存在本机 data/settings.json"></label>
+      <button type="submit" class="primary">保存设置</button>
+      <p id="settings-msg" class="muted"></p>
+    </form>
+  </section>
+  <script src="/app.js"></script>
+</body>
+</html>
