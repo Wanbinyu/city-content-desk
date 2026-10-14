@@ -118,7 +118,7 @@ class HttpFlowTest(unittest.TestCase):
         with urllib.request.urlopen(self.base + "/") as response:
             html = response.read().decode("utf-8")
         self.assertIn("城市内容台", html)
-        self.assertIn("拆解", (ROOT / "static" / "app.js").read_text(encoding="utf-8"))
+        self.assertIn("生成页面和视频", (ROOT / "static" / "index.html").read_text(encoding="utf-8"))
 
         status, board = request(self.base, "/api/board")
         self.assertEqual(status, 200)

@@ -1,17 +1,13 @@
-const STATUS = {
-  inbox: "待选",
-  broken: "已拆解",
-  drafted: "已出稿",
-  approved: "已通过",
-  queued: "待发布",
-};
-
-const state = {
-  posts: [],
-  currentId: null,
-  filter: "all",
-  settings: {},
-  notice: "",
+const DEMO = {
+  url: "https://v.douyin.com/example-beijing/",
+  title: "北京双眼皮机构对照表",
+  city: "武汉",
+  from_city: "",
+  topic: "双眼皮",
+  source: "user",
+  table_text: "1、北京示例机构甲：把项目和复查分开问\n2、北京示例机构乙：费用组成当面核对\n3、北京示例机构丙：不要只对照别人的成片\nhttps://v.douyin.com/example-beijing/\n",
+  notes: "把示例机构甲改成江汉示例",
+  caption: "",
 };
 
 function $(id) {
@@ -24,392 +20,218 @@ async function api(path, options = {}) {
     ...options,
   });
   const data = await response.json();
-  if (!response.ok) {
-    throw new Error(data.error || "请求失败");
-  }
+  if (!response.ok) throw new Error(data.error || "请求失败");
   return data;
 }
 
-function text(tag, value, className) {
-  const node = document.createElement(tag);
-  node.textContent = value == null ? "" : String(value);
-  if (className) node.className = className;
-  return node;
+function readForm() {
+  const form = new FormData($("form"));
+  return Object.fromEntries(form.entries());
 }
 
-function button(label, className, onClick) {
-  const node = document.createElement("button");
-  node.type = "button";
-  node.textContent = label;
-  if (className) node.className = className;
-  node.addEventListener("click", onClick);
-  return node;
-}
-
-function field(label, value, attrs) {
-  const wrap = document.createElement("label");
-  wrap.textContent = label;
-  const input = document.createElement(attrs.multiline ? "textarea" : "input");
-  if (attrs.multiline) input.rows = attrs.rows || 6;
-  input.value = value || "";
-  input.dataset.field = attrs.field;
-  wrap.appendChild(input);
-  return wrap;
-}
-
-function notify(text) {
-  state.notice = text || "";
-}
-
-function current() {
-  return state.posts.find((post) => post.id === state.currentId) || null;
-}
-
-function visiblePosts() {
-  return state.posts.filter((post) => {
-    if (state.filter === "all") return true;
-    if (state.filter === "risk") return Boolean(post.breakdown_risks);
-    return (post.keyword || "").includes(state.filter) || (post.title || "").includes(state.filter);
+function fillForm(values) {
+  const form = $("form");
+  Object.entries(values).forEach(([key, value]) => {
+    if (form.elements[key]) form.elements[key].value = value;
   });
+  const source = form.querySelector(`input[name=source][value="${values.source || "user"}"]`);
+  if (source) source.checked = true;
 }
 
-async function reload(keepId) {
-  const data = await api("/api/board");
-  state.posts = data.posts;
-  if (keepId && state.posts.some((post) => post.id === keepId)) {
-    state.currentId = keepId;
-  } else if (!current()) {
-    state.currentId = state.posts.length ? state.posts[0].id : null;
+function csvCell(value) {
+  const text = String(value ?? "");
+  if (/[",\n\r]/.test(text)) return `"${text.replaceAll('"', '""')}"`;
+  return text;
+}
+
+function writeTableText(columns, rows) {
+  const lines = [columns, ...rows].map((row) => row.map(csvCell).join(","));
+  $("form").elements.table_text.value = lines.join("\n");
+}
+
+function renderEditor(result) {
+  const columns = result.columns.map((column) => column);
+  const rows = result.rows.map((row) => row.slice());
+  writeTableText(columns, rows);
+  const wrap = document.createElement("div");
+  wrap.className = "editor-wrap";
+  const table = document.createElement("table");
+  table.className = "editor";
+
+  function sync() {
+    writeTableText(columns, rows);
+    draw();
   }
-  renderList();
-  renderDetail();
-}
 
-function renderList() {
-  const posts = visiblePosts();
-  $("list-count").textContent = `${posts.length} 条`;
-  const list = $("list");
-  list.replaceChildren();
-  posts.forEach((post) => {
-    const node = document.createElement("button");
-    node.type = "button";
-    node.className = post.id === state.currentId ? "post on" : "post";
-    node.appendChild(text("b", post.title));
-    const bits = [
-      post.keyword || "未标城市",
-      `${post.liked_count} 赞`,
-      STATUS[post.status] || post.status,
-      post.source,
-    ];
-    if (post.breakdown_risks) bits.push("有风险词");
-    node.appendChild(text("span", bits.join(" · ")));
-    node.addEventListener("click", () => {
-      if (post.id !== state.currentId) state.notice = "";
-      state.currentId = post.id;
-      renderList();
-      renderDetail();
+  function draw() {
+    table.replaceChildren();
+    const head = document.createElement("tr");
+    columns.forEach((column, index) => {
+      const cell = document.createElement("th");
+      const input = document.createElement("input");
+      input.value = column;
+      input.setAttribute("aria-label", "表头");
+      input.addEventListener("input", () => {
+        columns[index] = input.value;
+        writeTableText(columns, rows);
+      });
+      cell.appendChild(input);
+      head.appendChild(cell);
     });
-    list.appendChild(node);
+    head.appendChild(document.createElement("th"));
+    table.appendChild(head);
+    rows.forEach((row, rowIndex) => {
+      const line = document.createElement("tr");
+      row.forEach((value, columnIndex) => {
+        const cell = document.createElement("td");
+        const input = document.createElement("input");
+        input.value = value;
+        input.setAttribute("aria-label", `${columns[columnIndex] || "单元格"} 第${rowIndex + 1}行`);
+        input.addEventListener("input", () => {
+          rows[rowIndex][columnIndex] = input.value;
+          writeTableText(columns, rows);
+        });
+        cell.appendChild(input);
+        line.appendChild(cell);
+      });
+      const removeCell = document.createElement("td");
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "row-remove";
+      remove.textContent = "删除";
+      remove.addEventListener("click", () => {
+        if (rows.length === 1) return;
+        rows.splice(rowIndex, 1);
+        sync();
+      });
+      removeCell.appendChild(remove);
+      line.appendChild(removeCell);
+      table.appendChild(line);
+    });
+  }
+
+  draw();
+  wrap.appendChild(table);
+  const add = document.createElement("button");
+  add.type = "button";
+  add.textContent = "加一行";
+  add.addEventListener("click", () => {
+    rows.push(columns.map(() => ""));
+    sync();
   });
+  const box = document.createElement("div");
+  box.appendChild(wrap);
+  box.appendChild(add);
+  return box;
 }
 
-function renderDetail() {
-  const root = $("detail");
-  const post = current();
+function renderResult(result) {
+  const root = $("result");
   root.replaceChildren();
-  if (!post) {
-    root.appendChild(text("p", "还没有热帖。到「导入」贴表格、JSON 或链接。", "empty"));
-    return;
+  root.appendChild(Object.assign(document.createElement("h2"), { textContent: result.title }));
+  if (result.note) {
+    root.appendChild(Object.assign(document.createElement("p"), { className: "hint", textContent: result.note }));
   }
-  root.appendChild(text("h2", post.title));
-  if (state.notice) root.appendChild(text("p", state.notice, "ok"));
-  const meta = document.createElement("p");
-  meta.className = "meta";
-  meta.append(
-    text("span", post.author || "未知作者"),
-    text("span", `${post.liked_count} 赞`),
-    text("span", `${post.comment_count} 评论`),
-    text("span", STATUS[post.status] || post.status),
-  );
-  root.appendChild(meta);
-  if (post.aweme_url) {
-    const link = document.createElement("a");
-    link.href = post.aweme_url;
-    link.textContent = post.aweme_url;
-    link.target = "_blank";
-    link.rel = "noreferrer";
-    root.appendChild(link);
+  if (result.risks && result.risks.length) {
+    const risk = document.createElement("p");
+    risk.className = "risk";
+    risk.textContent = "这些词发布前要改掉：" + result.risks.join("、");
+    root.appendChild(risk);
   }
-  root.appendChild(text("h3", "口播"));
-  const transcript = document.createElement("textarea");
-  transcript.rows = 5;
-  transcript.value = post.transcript || "";
-  root.appendChild(transcript);
-  const transcriptRow = document.createElement("div");
-  transcriptRow.className = "row";
-  transcriptRow.append(
-    button("保存口播", "", async () => {
-      try {
-        await api(`/api/posts/${post.id}/transcript`, {
-          method: "POST",
-          body: JSON.stringify({ transcript: transcript.value }),
-        });
-        notify("口播已保存");
-        await reload(post.id);
-      } catch (error) {
-        notify(error.message);
-        renderDetail();
-      }
-    }),
-    button("用 f2 读取文案", "", async () => {
-      notify("正在调用 f2，可能需要一两分钟");
-      renderDetail();
-      try {
-        await api(`/api/posts/${post.id}/fetch`, { method: "POST", body: "{}" });
-        notify("已从 f2 读到文案");
-        await reload(post.id);
-      } catch (error) {
-        notify(error.message);
-        renderDetail();
-      }
-    }),
-  );
-  root.appendChild(transcriptRow);
+  $("form").elements.title.value = result.title;
+  $("form").elements.caption.value = result.caption;
 
-  root.appendChild(text("h3", "拆解"));
-  if (post.structure) {
-    const box = text("div", post.structure, "block");
-    root.appendChild(box);
-    const risk = post.breakdown_risks
-      ? `风险词：${post.breakdown_risks}`
-      : "这条口播里没有命中风险词";
-    root.appendChild(text("p", risk, post.breakdown_risks ? "risk" : "ok"));
+  const watch = document.createElement("div");
+  watch.className = "watch";
+  if (!result.preview && result.page_url) {
+    const stage = document.createElement("div");
+    stage.className = "stage";
+    const frame = document.createElement("iframe");
+    frame.src = result.page_url;
+    frame.title = "表格页面";
+    stage.appendChild(frame);
+    watch.appendChild(stage);
   }
-  root.appendChild(button("拆解", "primary", async () => {
-    try {
-      if (transcript.value !== (post.transcript || "")) {
-        await api(`/api/posts/${post.id}/transcript`, {
-          method: "POST",
-          body: JSON.stringify({ transcript: transcript.value }),
-        });
-      }
-      await api(`/api/posts/${post.id}/breakdown`, { method: "POST", body: "{}" });
-      notify("已拆解");
-      await reload(post.id);
-    } catch (error) {
-      notify(error.message);
-      renderDetail();
-    }
-  }));
-
-  root.appendChild(text("h3", "复刻稿"));
-  root.appendChild(text("p", "新稿不照搬原片原句。通过前会再拦一遍风险词。", "muted"));
-  const draftFields = document.createElement("div");
-  const inputs = {
-    title: field("标题", post.draft_title, { field: "title" }),
-    script: field("口播", post.draft_script, { field: "script", multiline: true, rows: 8 }),
-    shots: field("分镜", post.draft_shots, { field: "shots", multiline: true, rows: 4 }),
-    cover_text: field("封面文案", post.draft_cover, { field: "cover_text" }),
-    tags: field("标签", post.draft_tags, { field: "tags" }),
-  };
-  Object.values(inputs).forEach((node) => draftFields.appendChild(node));
-  root.appendChild(draftFields);
-  if (post.draft_note) root.appendChild(text("p", post.draft_note, "warn"));
-  if (post.draft_risks) root.appendChild(text("p", `稿内风险词：${post.draft_risks}`, "risk"));
-  if (post.draft_engine) {
-    root.appendChild(text("p", post.draft_engine === "llm" ? "这版来自大模型" : "这版是规则改写", "muted"));
+  const side = document.createElement("div");
+  side.className = "side";
+  if (result.video_url) {
+    const media = document.createElement("div");
+    media.appendChild(Object.assign(document.createElement("p"), { className: "kicker", textContent: "视频" }));
+    const video = document.createElement("video");
+    video.controls = true;
+    video.src = result.video_url;
+    media.appendChild(video);
+    side.appendChild(media);
+  } else if (result.video_message) {
+    side.appendChild(Object.assign(document.createElement("p"), { className: "hint", textContent: result.video_message }));
   }
+  const words = document.createElement("div");
+  words.appendChild(Object.assign(document.createElement("p"), { className: "kicker", textContent: "文案" }));
+  words.appendChild(Object.assign(document.createElement("pre"), { className: "copy", textContent: result.caption }));
+  side.appendChild(words);
+  watch.appendChild(side);
+  root.appendChild(watch);
 
-  const draftRow = document.createElement("div");
-  draftRow.className = "row";
-  draftRow.append(
-    button("生成复刻稿", "primary", async () => {
-      try {
-        await api(`/api/posts/${post.id}/draft`, {
-          method: "POST",
-          body: JSON.stringify({ city: state.settings.city || "" }),
-        });
-        notify("已生成复刻稿");
-        await reload(post.id);
-      } catch (error) {
-        notify(error.message);
-        renderDetail();
-      }
-    }),
-  );
-  if (post.draft_id) {
-    const readDraft = () => ({
-      title: draftFields.querySelector("[data-field=title]").value,
-      script: draftFields.querySelector("[data-field=script]").value,
-      shots: draftFields.querySelector("[data-field=shots]").value,
-      cover_text: draftFields.querySelector("[data-field=cover_text]").value,
-      tags: draftFields.querySelector("[data-field=tags]").value,
-    });
-    draftRow.append(
-      button("保存修改", "", async () => {
-        try {
-          await api(`/api/drafts/${post.draft_id}/body`, {
-            method: "PUT",
-            body: JSON.stringify(readDraft()),
-          });
-          notify("修改已保存");
-          await reload(post.id);
-        } catch (error) {
-          notify(error.message);
-          renderDetail();
-        }
-      }),
-      button("通过", "", async () => {
-        try {
-          await api(`/api/drafts/${post.draft_id}/body`, {
-            method: "PUT",
-            body: JSON.stringify(readDraft()),
-          });
-          await api(`/api/drafts/${post.draft_id}/approve`, { method: "POST", body: "{}" });
-          notify("已通过");
-          await reload(post.id);
-        } catch (error) {
-          notify(error.message);
-          renderDetail();
-        }
-      }),
-      button("退回", "danger", async () => {
-        try {
-          await api(`/api/drafts/${post.draft_id}/reject`, { method: "POST", body: "{}" });
-          notify("已退回，可以重写");
-          await reload(post.id);
-        } catch (error) {
-          notify(error.message);
-          renderDetail();
-        }
-      }),
-    );
-  }
-  root.appendChild(draftRow);
-
-  root.appendChild(text("h3", "发布包"));
-  const account = document.createElement("input");
-  account.placeholder = "发布账号名";
-  account.value = state.settings.sau_account || "";
-  const video = document.createElement("input");
-  video.placeholder = "成片绝对路径，只在确认上传时需要";
-  root.appendChild(account);
-  root.appendChild(video);
-  const publishRow = document.createElement("div");
-  publishRow.className = "row";
-  publishRow.append(
-    button("生成发布包", "primary", async () => {
-      if (!post.draft_id) {
-        notify("先生成并通过复刻稿");
-        renderDetail();
-        return;
-      }
-      try {
-        const result = await api(`/api/drafts/${post.draft_id}/package`, {
-          method: "POST",
-          body: JSON.stringify({ account: account.value, video_path: video.value, execute: false }),
-        });
-        notify(`${result.message} ${result.package_dir}`);
-        await reload(post.id);
-      } catch (error) {
-        notify(error.message);
-        renderDetail();
-      }
-    }),
-    button("确认并上传", "danger", async () => {
-      if (!window.confirm("确认这是本机构自己的成片，现在执行上传命令？")) return;
-      try {
-        const result = await api(`/api/drafts/${post.draft_id}/package`, {
-          method: "POST",
-          body: JSON.stringify({ account: account.value, video_path: video.value, execute: true }),
-        });
-        notify(result.message);
-        await reload(post.id);
-      } catch (error) {
-        notify(error.message);
-        renderDetail();
-      }
-    }),
-  );
-  root.appendChild(publishRow);
+  const details = document.createElement("details");
+  if (result.preview) details.open = true;
+  details.appendChild(Object.assign(document.createElement("summary"), { textContent: "改表格后再生成" }));
+  details.appendChild(renderEditor(result));
+  root.appendChild(details);
 }
 
-function bindTabs() {
-  document.querySelectorAll(".tab").forEach((node) => {
-    node.addEventListener("click", () => {
-      document.querySelectorAll(".tab").forEach((item) => item.classList.remove("on"));
-      node.classList.add("on");
-      ["work", "import", "settings"].forEach((name) => {
-        $(`tab-${name}`).hidden = name !== node.dataset.tab;
-      });
+document.querySelectorAll(".tab").forEach((node) => {
+  node.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach((item) => item.classList.remove("on"));
+    node.classList.add("on");
+    ["work", "settings"].forEach((name) => {
+      $(`tab-${name}`).hidden = name !== node.dataset.tab;
     });
   });
-  document.querySelectorAll(".chip").forEach((node) => {
-    node.addEventListener("click", () => {
-      document.querySelectorAll(".chip").forEach((item) => item.classList.remove("on"));
-      node.classList.add("on");
-      state.filter = node.dataset.filter;
-      renderList();
-    });
-  });
-}
-
-function bindImport() {
-  $("import-file").addEventListener("change", async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-    $("import-text").value = await file.text();
-  });
-  $("import-go").addEventListener("click", async () => {
-    try {
-      const result = await api("/api/import", {
-        method: "POST",
-        body: JSON.stringify({ text: $("import-text").value }),
-      });
-      $("import-msg").textContent = `识别 ${result.imported} 条，新增 ${result.added} 条`;
-      await reload(state.currentId);
-    } catch (error) {
-      $("import-msg").textContent = error.message;
-    }
-  });
-  $("load-demo").addEventListener("click", async () => {
-    const result = await api("/api/sample", { method: "POST", body: "{}" });
-    $("import-msg").textContent = `演示数据新增 ${result.added} 条`;
-    await reload(state.currentId);
-  });
-}
-
-function bindSettings() {
-  $("settings").addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const form = new FormData(event.target);
-    const body = Object.fromEntries(form.entries());
-    try {
-      state.settings = await api("/api/settings", { method: "PUT", body: JSON.stringify(body) });
-      fillSettings();
-      $("settings-msg").textContent = "已保存到本机 data/settings.json";
-    } catch (error) {
-      $("settings-msg").textContent = error.message;
-    }
-  });
-}
-
-function fillSettings() {
-  const form = $("settings");
-  ["city", "selling_points", "llm_base_url", "llm_model", "llm_api_key", "sau_account", "f2_cookie"].forEach((name) => {
-    form.elements[name].value = state.settings[name] || "";
-  });
-}
-
-async function boot() {
-  bindTabs();
-  bindImport();
-  bindSettings();
-  state.settings = await api("/api/settings");
-  fillSettings();
-  await reload(null);
-}
-
-boot().catch((error) => {
-  document.body.appendChild(text("p", error.message, "risk"));
 });
+
+$("demo").addEventListener("click", () => fillForm(DEMO));
+
+async function submitTable(preview) {
+  const message = $("form-msg");
+  message.textContent = preview ? "正在整理表格" : "正在生成页面和视频";
+  try {
+    const body = readForm();
+    if (preview) body.preview = true;
+    const result = await api("/api/table", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+    message.textContent = preview ? "表格已整理，可以改完再生成" : (result.video_url ? "页面和视频已生成" : "页面已生成");
+    renderResult(result);
+  } catch (error) {
+    message.textContent = error.message;
+  }
+}
+
+$("preview").addEventListener("click", () => submitTable(true));
+
+$("form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await submitTable(false);
+});
+
+$("settings").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const body = Object.fromEntries(new FormData(event.target).entries());
+  try {
+    const saved = await api("/api/settings", { method: "PUT", body: JSON.stringify(body) });
+    ["llm_base_url", "llm_model", "llm_api_key", "f2_cookie"].forEach((name) => {
+      event.target.elements[name].value = saved[name] || "";
+    });
+    $("settings-msg").textContent = "已保存";
+  } catch (error) {
+    $("settings-msg").textContent = error.message;
+  }
+});
+
+api("/api/settings").then((settings) => {
+  const form = $("settings");
+  ["llm_base_url", "llm_model", "llm_api_key", "f2_cookie"].forEach((name) => {
+    form.elements[name].value = settings[name] || "";
+  });
+}).catch(() => {});

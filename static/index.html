@@ -7,66 +7,109 @@
   <link rel="stylesheet" href="/app.css">
 </head>
 <body>
-  <header>
-    <div>
-      <p class="mark">MVP</p>
-      <h1>城市内容台</h1>
-      <p class="lede">选热帖，拆结构，写成可审的口播。人通过之后才生成发布包，默认不上传。</p>
-    </div>
-    <nav>
-      <button type="button" class="tab on" data-tab="work">工作台</button>
-      <button type="button" class="tab" data-tab="import">导入</button>
-      <button type="button" class="tab" data-tab="settings">设置</button>
-    </nav>
-  </header>
-
-  <section id="tab-work">
-    <div class="layout">
-      <aside>
-        <div class="filters">
-          <button type="button" class="chip on" data-filter="all">全部</button>
-          <button type="button" class="chip" data-filter="北京">北京</button>
-          <button type="button" class="chip" data-filter="深圳">深圳</button>
-          <button type="button" class="chip" data-filter="上海">上海</button>
-          <button type="button" class="chip" data-filter="risk">有风险词</button>
-        </div>
-        <p id="list-count" class="muted"></p>
-        <div id="list"></div>
-      </aside>
-      <article id="detail">
-        <p class="empty">从左边选一条热帖。</p>
-      </article>
-    </div>
-  </section>
-
-  <section id="tab-import" hidden>
-    <div class="panel">
-      <h2>导入热帖</h2>
-      <p>可以贴带表头的 CSV、MediaCrawler 导出的 JSON，或一行一个抖音链接。链接本身不会自动下载，要点单条里的「用 f2 读取文案」。</p>
-      <textarea id="import-text" rows="12" placeholder="标题,点赞,评论,链接,关键词,口播"></textarea>
-      <div class="row">
-        <label class="file">选择文件<input id="import-file" type="file" accept=".csv,.json,.txt,text/plain"></label>
-        <button type="button" id="import-go" class="primary">导入</button>
-        <button type="button" id="load-demo">载入演示数据</button>
+  <div class="page">
+    <header>
+      <div>
+        <h1>城市内容台</h1>
+        <p class="lede">把一张城市对照表，换成另一个城市的页面、视频和文案。</p>
       </div>
-      <p id="import-msg" class="muted"></p>
-    </div>
-  </section>
+      <nav>
+        <button type="button" class="quiet tab on" data-tab="work">制作</button>
+        <button type="button" class="quiet tab" data-tab="settings">设置</button>
+      </nav>
+    </header>
 
-  <section id="tab-settings" hidden>
-    <form id="settings" class="panel">
-      <h2>设置</h2>
-      <label>默认城市<input name="city" maxlength="20"></label>
-      <label>机构已可对外说明的信息<textarea name="selling_points" rows="4" placeholder="不要写效果承诺。有风险词的句子不会进复刻稿。"></textarea></label>
-      <label>发布账号名<input name="sau_account" placeholder="social-auto-upload 里登录时用的账号名"></label>
-      <label>大模型地址<input name="llm_base_url" placeholder="https://api.example.com/v1 留空则只用规则改写"></label>
-      <label>模型名<input name="llm_model" placeholder="deepseek-chat"></label>
-      <label>API key<input name="llm_api_key" type="password" autocomplete="off"></label>
-      <label>f2 的抖音 cookie<input name="f2_cookie" type="password" autocomplete="off" placeholder="只保存在本机 data/settings.json"></label>
-      <button type="submit" class="primary">保存设置</button>
-      <p id="settings-msg" class="muted"></p>
-    </form>
-  </section>
+    <section id="tab-work">
+      <div class="workspace">
+        <form id="form" class="card">
+          <h2>原来的内容</h2>
+          <label>原视频标题<input name="title" placeholder="北京双眼皮机构对照表"></label>
+          <label>表格或文案<textarea name="table_text" rows="4" placeholder="1、北京示例机构甲：把项目和复查分开问"></textarea></label>
+
+          <h2>换成</h2>
+          <div class="split">
+            <label>目标城市<input name="city" list="cities" value="武汉"></label>
+            <label>选题<input name="topic" value="双眼皮"></label>
+          </div>
+
+          <div class="actions">
+            <button type="submit" class="primary">生成页面和视频</button>
+            <button type="button" id="demo" class="quiet">填入示例</button>
+            <button type="button" id="preview" class="quiet">只整理表格</button>
+          </div>
+          <p id="form-msg" class="hint"></p>
+
+          <details class="more">
+            <summary>更多选项</summary>
+            <label>抖音链接<input name="url" placeholder="https://v.douyin.com/..."></label>
+            <label>原城市<input name="from_city" list="cities" placeholder="不在常见城市里时再填"></label>
+            <p class="field-label">内容从哪来</p>
+            <div class="segment">
+              <label><input type="radio" name="source" value="user" checked><span>我来贴</span></label>
+              <label><input type="radio" name="source" value="script"><span>排名文件</span></label>
+              <label><input type="radio" name="source" value="ai"><span>模型整理</span></label>
+            </div>
+            <label>补充说明<textarea name="notes" rows="2" placeholder="把示例机构甲改成某某"></textarea></label>
+            <label>视频文案<textarea name="caption" rows="3" placeholder="留空就按表格写一条"></textarea></label>
+            <p class="hint">脚本和模型都不编造机构、价格或排名。</p>
+          </details>
+
+          <datalist id="cities">
+            <option value="武汉"></option>
+            <option value="北京"></option>
+            <option value="上海"></option>
+            <option value="深圳"></option>
+            <option value="广州"></option>
+            <option value="杭州"></option>
+            <option value="成都"></option>
+            <option value="南京"></option>
+            <option value="西安"></option>
+            <option value="重庆"></option>
+            <option value="苏州"></option>
+            <option value="青岛"></option>
+            <option value="长沙"></option>
+            <option value="郑州"></option>
+            <option value="天津"></option>
+            <option value="宁波"></option>
+            <option value="厦门"></option>
+            <option value="合肥"></option>
+            <option value="昆明"></option>
+            <option value="沈阳"></option>
+            <option value="大连"></option>
+            <option value="济南"></option>
+            <option value="福州"></option>
+            <option value="无锡"></option>
+            <option value="佛山"></option>
+            <option value="东莞"></option>
+            <option value="哈尔滨"></option>
+            <option value="温州"></option>
+            <option value="泉州"></option>
+            <option value="烟台"></option>
+          </datalist>
+        </form>
+
+        <article id="result" class="card result">
+          <div class="placeholder">
+            <div class="phone-ghost" aria-hidden="true"></div>
+            <p>生成后，页面、视频和文案会出现在这里。</p>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="tab-settings" hidden>
+      <form id="settings" class="card settings">
+        <h2>设置</h2>
+        <p class="hint">给客户演示时可以不填。模型只整理你贴上的文字。</p>
+        <label>模型地址<input name="llm_base_url" placeholder="https://api.example.com/v1"></label>
+        <label>模型名<input name="llm_model" placeholder="deepseek-chat"></label>
+        <label>API key<input name="llm_api_key" type="password" autocomplete="off"></label>
+        <label>抖音 cookie<input name="f2_cookie" type="password" autocomplete="off"></label>
+        <button type="submit" class="primary">保存</button>
+        <p id="settings-msg" class="hint"></p>
+      </form>
+    </section>
+  </div>
   <script src="/app.js"></script>
 </body>
 </html>

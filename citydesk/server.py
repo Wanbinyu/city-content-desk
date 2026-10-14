@@ -19,6 +19,7 @@ from citydesk.service import (
     reject_draft,
     revise_draft,
 )
+from citydesk.jobs import generate_table
 from citydesk.settings import load_settings, public_settings, save_settings
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -70,6 +71,9 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(204)
             self.end_headers()
             return
+        if path.startswith("/outputs/"):
+            self._output(path)
+            return
         self._error(404, "没有这个页面")
 
     def do_POST(self) -> None:
@@ -82,6 +86,11 @@ class Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         parts = [part for part in path.split("/") if part]
         try:
+            if method == "POST" and path == "/api/table":
+                body = self._body()
+                result = generate_table(body, self.app.db_path, load_settings(self.app.db_path))
+                self._json(result)
+                return
             if method == "POST" and path == "/api/import":
                 body = self._body()
                 result = self.app.call(lambda conn: import_text(conn, body.get("text", "")))
@@ -167,6 +176,14 @@ class Handler(BaseHTTPRequestHandler):
 
     def _error(self, status: int, message: str) -> None:
         self._json({"error": message}, status)
+
+    def _output(self, path: str) -> None:
+        root = (self.app.db_path.parent / "outputs").resolve()
+        target = (root / path[len("/outputs/") :]).resolve()
+        if target != root and root not in target.parents:
+            self._error(404, "没有这个文件")
+            return
+        self._file(target)
 
     def _file(self, path: Path) -> None:
         if not path.is_file():
